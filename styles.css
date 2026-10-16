@@ -7,3 +7,10 @@
 /* Keep numeric data readable without changing the compact dashboard layout. */
 table{font-size:12px}th,th button{font-size:11px}.category-tag{font-size:10px}.panel-heading p{color:#8b7c82}.kpi-footer{color:#87737b}.page-heading p{color:#827379}.legend-row .percent{color:#88747c}.filter-grid label{color:#806f76}
 @media(max-width:560px){table{font-size:11px}.kpi.primary .kpi-value{font-size:clamp(18px,5.7vw,24px)}.kpi.primary .kpi-value small{margin-left:2px}.kpi-value{font-size:clamp(22px,6vw,28px)}}
+/* Database connection state is visible on desktop and mobile. */
+.connection-panel{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:17px 20px;margin-bottom:20px;border:1px solid #efdae5;border-radius:12px;background:#fff8fc}
+.connection-copy{min-width:0}.connection-copy strong{font-size:12px;color:#91516f}.connection-copy p{font-size:11px;color:#876f7d;line-height:1.6;margin:6px 0 0;overflow-wrap:anywhere}
+.connection-panel .button{flex-shrink:0;min-width:95px}.connection-panel[data-state="error"]{background:#fff7f7;border-color:#edcccc}.connection-panel[data-state="error"] strong{color:#9e4148}
+.connection-panel[data-state="loading"] .connection-copy strong::before{content:"";display:inline-block;width:8px;height:8px;background:#ce84a7;border-radius:50%;margin-right:8px}
+.period-tabs{min-width:0;overflow-x:auto;max-width:70%;flex-shrink:1}.period-tabs button{white-space:nowrap}.filter-title,.reset-button{flex-shrink:0}
+@media(max-width:560px){.connection-panel{align-items:flex-start;padding:15px 13px;gap:10px}.connection-copy strong{font-size:11px}.connection-copy p{font-size:10px}.connection-panel .button{min-width:75px;padding:9px 8px}.filter-top{gap:7px}.period-tabs{max-width:62%}.source-period{font-size:9px}}

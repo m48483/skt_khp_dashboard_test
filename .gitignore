@@ -4,3 +4,8 @@ __pycache__/
 node_modules/
 test-results/
 .DS_Store
+
+# Local credentials must never be committed.
+.env
+.env.*
+!.env.example

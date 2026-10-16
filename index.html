@@ -7,7 +7,8 @@
   <meta name="description" content="매장 판매 실적을 기간, 지역, 매장, 상품군별로 분석하는 대시보드">
   <title>판매 인사이트 · Store Analytics</title>
   <link rel="stylesheet" href="styles.css">
-  <script defer src="data/sales.js"></script>
+  <script defer src="supabase-config.js"></script>
+  <script defer src="supabase-client.js"></script>
   <script defer src="analytics.js"></script>
   <script defer src="app.js"></script>
 </head>
@@ -22,14 +23,18 @@
       <a class="nav-item" href="#product-section"><span>◈</span>상품별 분석</a>
       <a class="nav-item" href="#transactions"><span>≡</span>판매 상세 내역</a>
     </nav>
-    <div class="sidebar-bottom"><div class="source-badge"><span class="status-dot"></span>업로드 데이터 연결됨</div><p>매장판매실적.xlsx</p><small>2026년 3분기 판매 데이터</small><div class="sidebar-profile"><span>SA</span><div>Sales Analytics<small>매장 실적 분석 공간</small></div></div></div>
+    <div class="sidebar-bottom"><div class="source-badge"><span class="status-dot"></span><span id="sidebar-status">DB 연결 중</span></div><p>Supabase 판매 데이터</p><small id="source-description">판매 기록을 불러오고 있습니다</small><div class="sidebar-profile"><span>SA</span><div>Sales Analytics<small>매장 실적 분석 공간</small></div></div></div>
   </aside>
   <main id="overview">
-    <header class="topbar"><div>워크스페이스 <span>/</span> <strong>실적 대시보드</strong></div><span class="period-badge"><span class="status-dot"></span>2026 Q3</span></header>
+    <header class="topbar"><div>워크스페이스 <span>/</span> <strong>실적 대시보드</strong></div><span class="period-badge"><span class="status-dot"></span><span id="source-period">Supabase</span></span></header>
     <div class="page-content">
       <section class="page-heading"><div><div class="eyebrow">SALES OVERVIEW</div><h1>판매 실적 대시보드<span class="heading-dot">.</span></h1><p>흩어진 판매 기록을 한눈에, 더 나은 매장 운영의 시작.</p></div><button class="button export-button" id="export" title="상세 검색을 포함한 현재 조회 결과를 다운로드합니다"><span aria-hidden="true">↓</span> CSV 다운로드</button></section>
+      <section class="connection-panel" id="connection-panel" data-state="loading" aria-busy="true">
+        <div class="connection-copy" role="status" aria-live="polite"><strong id="connection-title">판매 데이터를 불러오는 중입니다</strong><p id="connection-description">Supabase에서 최신 판매 기록을 조회하고 있습니다.</p></div>
+        <button class="button" id="refresh-data" disabled>불러오는 중…</button>
+      </section>
       <section class="filters panel" aria-label="판매 데이터 필터">
-        <div class="filter-top"><div class="filter-title"><span aria-hidden="true">☷</span> 조회 조건</div><div class="period-tabs" aria-label="기간 빠른 선택"><button data-month="all" class="selected" aria-pressed="true">전체 기간</button><button data-month="07" aria-pressed="false">7월</button><button data-month="08" aria-pressed="false">8월</button><button data-month="09" aria-pressed="false">9월</button></div><button id="reset" class="reset-button">↻ 초기화</button></div>
+        <div class="filter-top"><div class="filter-title"><span aria-hidden="true">☷</span> 조회 조건</div><div class="period-tabs" aria-label="기간 빠른 선택"><button data-month="all" class="selected" aria-pressed="true">전체 기간</button></div><button id="reset" class="reset-button">↻ 초기화</button></div>
         <div class="filter-grid"><div class="date-filter"><label for="start-date">조회 기간</label><div class="date-range"><input type="date" id="start-date" aria-label="시작일"><span>—</span><input type="date" id="end-date" aria-label="종료일"></div></div><div><label for="region">지역</label><select id="region"><option value="">전체 지역</option></select></div><div><label for="store">매장</label><select id="store"><option value="">전체 매장</option></select></div><div><label for="category">상품군</label><select id="category"><option value="">전체 상품군</option></select></div></div>
         <p id="date-error" class="error" role="alert" hidden>시작일은 종료일보다 늦을 수 없습니다.</p>
       </section>
@@ -50,7 +55,7 @@
       </section>
       <details class="quality-panel" id="quality"><summary><span class="quality-icon">i</span><span>데이터 안내 <strong id="quality-summary"></strong></span><span class="quality-more">정제 기준 보기 ⌄</span></summary><div class="quality-content"><p>날짜 형식을 통일하고 지역의 행정구역 표기를 7개 지역으로 정규화했습니다. ‘원’과 쉼표가 포함된 금액은 숫자로 변환했습니다.</p><p>수량 누락은 추정하지 않고 수량 합계에서만 제외합니다. 요금제 공란은 ‘미기재’로 표시합니다. 거래 ID가 없어 동일한 내용의 행도 기본 집계에 유지합니다. 중복 의심 제외를 켜면 정규화 후 모든 항목이 같은 행 중 첫 행만 남깁니다.</p><label class="checkbox-label"><input type="checkbox" id="exclude-duplicates"> 중복 의심 행을 집계에서 제외</label></div></details>
       <section class="panel transactions" id="transactions"><div class="panel-heading"><div><h2>판매 상세 내역 <span class="tiny-badge" id="table-count"></span></h2><p>조회 조건에 해당하는 판매 기록을 살펴보세요</p></div><div class="search-wrap"><span aria-hidden="true">⌕</span><input type="search" id="search" placeholder="매장, 요금제, 담당자 검색" aria-label="판매 상세 내역 검색"></div></div><div class="table-scroll"><table><thead><tr><th><button id="sort-date">판매일 ↓</button></th><th>지역</th><th>매장명</th><th>상품군</th><th>요금제</th><th class="numeric">수량</th><th class="numeric"><button id="sort-revenue">매출액 ↕</button></th><th>담당자</th></tr></thead><tbody id="sales-table"></tbody></table></div><div class="table-footer"><span id="page-info" aria-live="polite"></span><div class="pagination"><button id="prev-page" aria-label="이전 페이지">←</button><span id="page-number"></span><button id="next-page" aria-label="다음 페이지">→</button></div></div></section>
-      <footer class="page-footer"><span><strong>storeinsight</strong> · 데이터로 보는 매장의 오늘</span><span>출처: 매장판매실적.xlsx · 금액 단위: 원</span></footer>
+      <footer class="page-footer"><span><strong>storeinsight</strong> · 데이터로 보는 매장의 오늘</span><span id="source-caption">출처: Supabase · 금액 단위: 원</span></footer>
     </div>
   </main>
   <div id="toast" class="toast" role="status" hidden></div>

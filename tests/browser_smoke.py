@@ -8,7 +8,8 @@ from pathlib import Path
 import shutil
 import tempfile
 import threading
-from playwright.sync_api import sync_playwright
+from urllib.parse import urlparse, parse_qs
+from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
 raw = (ROOT/'data/sales.js').read_text(encoding='utf-8')
@@ -28,14 +29,27 @@ try:
         page=browser.new_page(viewport={'width':1440,'height':1000},locale='ko-KR',accept_downloads=True)
         errors=[]
         page.on('pageerror',lambda e: errors.append(str(e)))
+        # Simulate the PostgREST contract. This is not a live Supabase assertion.
+        requests=[]
+        def api(route):
+            query=parse_qs(urlparse(route.request.url).query)
+            after=int(query['id'][0].split('.')[1])
+            selected=[r for r in rows if r['id']>after]
+            page_rows=selected[:int(query['limit'][0])]
+            requests.append(route.request.url)
+            route.fulfill(status=200, json=page_rows, headers={'Content-Range':f'0-{max(0,len(page_rows)-1)}/{len(selected)}', 'Access-Control-Expose-Headers':'Content-Range'})
+        page.route('**/rest/v1/dashboard_sales?*',api)
         page.goto(f'http://127.0.0.1:{server.server_port}',wait_until='networkidle')
+        expect(page.locator('#connection-panel')).to_have_attribute('data-state','ready')
+        assert len(requests)==3, 'All 1,017 rows must be fetched over three pages'
+        assert page.locator('script[src="data/sales.js"]').count()==0
         def total(expected):
             assert page.locator('#total-revenue').inner_text() == f'{expected:,}원'
         total(515999400)
         assert page.locator('#total-transactions').inner_text()=='1,017건'
         assert page.locator('#sales-table tr').count()==10
-        print('PASS: initial page, workbook totals and populated table')
-        page.locator('[data-month="08"]').click()
+        print('PASS: mocked Supabase pagination, workbook totals and populated table')
+        page.locator('[data-month="2026-08"]').click()
         page.select_option('#region','서울');page.select_option('#store','홍대점');page.select_option('#category','기기')
         expected=[r for r in rows if r['date'].startswith('2026-08') and r['region']=='서울' and r['store']=='홍대점' and r['category']=='기기']
         total(sum(r['revenue'] for r in expected))

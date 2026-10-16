@@ -1,6 +1,7 @@
 'use strict';
 const A = window.Analytics;
-const data = window.SALES_DATA;
+let data = {source: 'Supabase', rows: [], summary: {start: '', end: ''}};
+let loading = false;
 const $ = id => document.getElementById(id);
 const number = value => new Intl.NumberFormat('ko-KR').format(Math.round(value));
 const money = value => number(value) + '원';
@@ -9,6 +10,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;',
 const colors = {'기기':'#d88caf','5G요금제':'#a8a2d2','인터넷·TV':'#b18798','LTE요금제':'#d5bf8d','액세서리':'#b6cbd3'};
 const state = {start:data.summary.start, end:data.summary.end, region:'', store:'', category:'', excludeDuplicates:false, grain:'day', query:'', sort:'date', direction:-1, page:1};
 let filtered = [], tableRows = [], toastTimer;
+const productColor = name => Object.hasOwn(colors, name) ? colors[name] : '#ba8fa9';
 const empty = message => `<div class="empty-state"><span>◌</span>${esc(message)}</div>`;
 function options(id, values, label) {
   $(id).innerHTML = `<option value="">${label}</option>` + [...new Set(values)].sort((a,b)=>a.localeCompare(b,'ko')).map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
@@ -23,13 +25,13 @@ function render() {
   $('date-error').hidden=!invalid;
   filtered = invalid ? [] : A.filter(data.rows, state);
   const totals=A.summarize(filtered);
-  $('period-label').textContent=`${state.start.replaceAll('-','.')} — ${state.end.replaceAll('-','.')}`;
+  $('period-label').textContent=state.start && state.end ? `${state.start.replaceAll('-','.')} — ${state.end.replaceAll('-','.')}` : '조회 기간 없음';
   $('filter-summary').textContent=`${state.region || '전체 지역'} · ${state.store || '전체 매장'} · ${number(totals.count)}건`;
   $('total-revenue').innerHTML=`${number(totals.revenue)}<small>원</small>`;
   $('total-quantity').innerHTML=`${number(totals.quantity)}<small>개</small>`;
   $('total-transactions').innerHTML=`${number(totals.count)}<small>건</small>`;
   $('total-stores').innerHTML=`${totals.stores}<small>개 매장</small>`;
-  const days = invalid ? 0 : Math.round((new Date(state.end)-new Date(state.start))/864e5)+1;
+  const days = invalid || !state.start || !state.end ? 0 : Math.round((new Date(state.end)-new Date(state.start))/864e5)+1;
   $('revenue-note').textContent=`일평균 ${days ? money(totals.revenue/days) : '—'} · 선택 기간 기준`;
   $('quantity-note').textContent=totals.missing ? `수량 미기재 ${totals.missing}건 제외` : '수량이 기재된 판매 기록 기준';
   $('transaction-note').textContent=`건당 평균 ${totals.count ? money(totals.revenue/totals.count) : '—'}`;
@@ -40,7 +42,8 @@ function render() {
   $('quality-summary').textContent=`현재 조회: 수량 미기재 ${missing}건 · 중복 의심 ${duplicates}건${state.excludeDuplicates?' · 중복 제외 적용 중':' 포함'}`;
   document.querySelectorAll('[data-month]').forEach(button=>{
     const month=button.dataset.month;
-    const on=month==='all' ? state.start===data.summary.start && state.end===data.summary.end : state.start===`2026-${month}-01` && state.end===`2026-${month}-${month==='09'?'30':'31'}`;
+    const range = monthRange(month);
+    const on=state.start===range.start && state.end===range.end;
     button.classList.toggle('selected',on);button.setAttribute('aria-pressed',String(on));
   });
 }
@@ -71,9 +74,9 @@ function renderTrend() {
 function renderProduct() {
   const groups=A.group(filtered,'category'),total=A.sum(filtered,'revenue');
   if(!groups.length){$('product-chart').innerHTML=empty('상품 데이터가 없습니다');$('product-legend').innerHTML='';return;}
-  let cursor=0;const stops=groups.map(g=>{const start=cursor;cursor+=total?g.revenue/total*100:0;return `${colors[g.name]} ${start}% ${cursor}%`;});
+  let cursor=0;const stops=groups.map(g=>{const start=cursor;cursor+=total?g.revenue/total*100:0;return `${productColor(g.name)} ${start}% ${cursor}%`;});
   $('product-chart').innerHTML=`<div class="donut-wrap"><div class="donut" style="background:conic-gradient(${total?stops.join(','):'#f1e8ec 0% 100%'})" role="img" aria-label="상품군 매출 비중: ${esc(groups.map(g=>g.name+' '+(total?g.revenue/total*100:0).toFixed(1)+'%').join(', '))}"></div><div class="donut-center"><span>매출 1위 상품군</span><strong>${esc(groups[0].name)}</strong><small>전체 매출의 ${total?(groups[0].revenue/total*100).toFixed(1):'0.0'}%</small></div></div>`;
-  $('product-legend').innerHTML=groups.map(g=>`<div class="legend-row"><span><i class="legend-dot" style="background:${colors[g.name]}"></i>${esc(g.name)}</span><span class="amount">${shortMoney(g.revenue)}원</span><span class="percent">${total?(g.revenue/total*100).toFixed(1):'0.0'}%</span></div>`).join('');
+  $('product-legend').innerHTML=groups.map(g=>`<div class="legend-row"><span><i class="legend-dot" style="background:${productColor(g.name)}"></i>${esc(g.name)}</span><span class="amount">${shortMoney(g.revenue)}원</span><span class="percent">${total?(g.revenue/total*100).toFixed(1):'0.0'}%</span></div>`).join('');
 }
 function renderRanking() {
   const groups=A.group(filtered,'store').slice(0,5);
@@ -99,9 +102,8 @@ function renderTable() {
   }
 }
 function setDates(start,end){state.start=start;state.end=end;$('start-date').value=start;$('end-date').value=end;}
-options('region',data.rows.map(r=>r.region),'전체 지역');options('category',data.rows.map(r=>r.category),'전체 상품군');updateStores();setDates(state.start,state.end);
+
 for(const id of ['start-date','end-date']) {
-  $(id).min=data.summary.start;$(id).max=data.summary.end;
   $(id).addEventListener('change',()=>{
     const start=$('start-date').value||data.summary.start,end=$('end-date').value||data.summary.end;
     setDates(start<data.summary.start?data.summary.start:start>data.summary.end?data.summary.end:start,end>data.summary.end?data.summary.end:end<data.summary.start?data.summary.start:end);
@@ -109,7 +111,12 @@ for(const id of ['start-date','end-date']) {
   });
 }
 for(const id of ['region','store','category']) $(id).addEventListener('change',()=>{state[id]=$(id).value;state.page=1;if(id==='region')updateStores();render();});
-document.querySelectorAll('[data-month]').forEach(button=>button.addEventListener('click',()=>{const month=button.dataset.month;setDates(month==='all'?data.summary.start:`2026-${month}-01`,month==='all'?data.summary.end:`2026-${month}-${month==='09'?'30':'31'}`);state.page=1;render();}));
+document.querySelector('.period-tabs').addEventListener('click', event => {
+  const button = event.target.closest('[data-month]');
+  if (!button || loading || button.disabled) return;
+  const range = monthRange(button.dataset.month);
+  setDates(range.start, range.end); state.page = 1; render();
+});
 document.querySelectorAll('[data-grain]').forEach(button=>button.addEventListener('click',()=>{state.grain=button.dataset.grain;document.querySelectorAll('[data-grain]').forEach(b=>{b.classList.toggle('selected',b===button);b.setAttribute('aria-pressed',String(b===button));});renderTrend();}));
 $('reset').addEventListener('click',()=>{Object.assign(state,{region:'',store:'',category:'',query:'',excludeDuplicates:false,page:1,sort:'date',direction:-1});setDates(data.summary.start,data.summary.end);$('region').value='';$('category').value='';$('search').value='';$('exclude-duplicates').checked=false;updateStores();render();});
 $('exclude-duplicates').addEventListener('change',()=>{state.excludeDuplicates=$('exclude-duplicates').checked;state.page=1;render();});
@@ -122,4 +129,97 @@ $('export').addEventListener('click',()=>{
   $('toast').textContent=`현재 조회·검색 결과 ${number(tableRows.length)}건을 다운로드했습니다.`;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,3500);
 });
 document.querySelectorAll('.nav-item').forEach(link=>link.addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(l=>l.classList.toggle('active',l===link));}));
-render();
+
+function monthRange(month) {
+  if (month === 'all') return {start: data.summary.start, end: data.summary.end};
+  const [year, number] = month.split('-').map(Number);
+  const start = month + '-01';
+  const end = new Date(Date.UTC(year, number, 0)).toISOString().slice(0, 10);
+  return {start: start < data.summary.start ? data.summary.start : start,
+    end: end > data.summary.end ? data.summary.end : end};
+}
+
+function initializeFilters(previous = null) {
+  options('region', data.rows.map(row => row.region), '전체 지역');
+  options('category', data.rows.map(row => row.category), '전체 상품군');
+  for (const key of ['region', 'category']) {
+    if (![...$(key).options].some(option => option.value === state[key])) state[key] = '';
+    $(key).value = state[key];
+  }
+  updateStores();
+  const months = [...new Set(data.rows.map(row => row.date.slice(0, 7)))].sort();
+  const multipleYears = new Set(months.map(month => month.slice(0, 4))).size > 1;
+  document.querySelector('.period-tabs').innerHTML = '<button data-month="all" aria-pressed="false">전체 기간</button>'
+    + months.map(month => `<button data-month="${month}" aria-pressed="false">${multipleYears ? month.slice(0, 4) + '.' : ''}${Number(month.slice(5))}월</button>`).join('');
+  for (const id of ['start-date', 'end-date']) {
+    $(id).min = data.summary.start; $(id).max = data.summary.end;
+  }
+  const usedAll = !previous || !previous.start || (state.start === previous.start && state.end === previous.end);
+  let start = usedAll ? data.summary.start : [state.start, data.summary.start].sort().at(-1);
+  let end = usedAll ? data.summary.end : [state.end, data.summary.end].sort()[0];
+  if (!start || !end || start > end) {start = data.summary.start; end = data.summary.end;}
+  setDates(start, end);
+  state.page = 1;
+}
+
+function setControlsEnabled(enabled) {
+  document.querySelectorAll('.filters button, .filters input, .filters select, .segmented button, #quality input, #transactions input, #transactions button, #export')
+    .forEach(control => {control.disabled = !enabled;});
+}
+
+function connection(status, title, description) {
+  $('connection-panel').dataset.state = status;
+  $('connection-panel').setAttribute('aria-busy', String(status === 'loading'));
+  $('connection-title').textContent = title;
+  $('connection-description').textContent = description;
+  $('sidebar-status').textContent = status === 'ready' ? 'Supabase 연결됨' : status === 'loading' ? 'DB 연결 중' : status === 'empty' ? '조회 결과 없음' : 'DB 연결 확인 필요';
+}
+
+async function refreshData() {
+  if (loading) return;
+  loading = true;
+  setControlsEnabled(false);
+  $('refresh-data').disabled = true;
+  $('refresh-data').textContent = '불러오는 중…';
+  connection('loading', '판매 데이터를 불러오는 중입니다', 'Supabase에서 최신 판매 기록을 조회하고 있습니다.');
+  const previous = data.summary;
+  // Clear the old values while loading; a failed request never masquerades as live data.
+  data = {source: 'Supabase', rows: [], summary: {start: '', end: ''}};
+  render();
+  document.querySelectorAll('.kpi-value').forEach(el => {el.textContent = '—';});
+  for (const id of ['revenue-note', 'quantity-note', 'transaction-note', 'store-note']) $(id).textContent = 'DB 조회 대기 중';
+  $('source-description').textContent = '판매 기록을 불러오고 있습니다';
+  $('source-period').textContent = 'Supabase';
+  $('source-caption').textContent = '출처: Supabase · 금액 단위: 원';
+  try {
+    data = await window.SupabaseSales.load(window.SUPABASE_CONFIG);
+    initializeFilters(previous);
+    if (data.rows.length) {
+      setControlsEnabled(true);
+      render();
+      const time = new Date().toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit', hour12: false});
+      connection('ready', `Supabase 연결됨 · ${number(data.rows.length)}건`, `${time} 조회 완료 · DB에서 변경한 판매 기록은 새로고침하면 반영됩니다.`);
+      $('source-description').textContent = `${data.summary.start} ~ ${data.summary.end}`;
+      $('source-period').textContent = `${data.summary.start.slice(0, 7).replace('-', '.')} – ${data.summary.end.slice(0, 7).replace('-', '.')}`;
+      $('source-caption').textContent = `출처: Supabase · ${time} 조회 · 금액 단위: 원`;
+    } else {
+      render(); setControlsEnabled(false);
+      connection('empty', '조회 가능한 판매 기록이 없습니다', 'Supabase의 판매 테이블과 조회 권한을 확인한 뒤 다시 불러와 주세요.');
+      $('source-description').textContent = '조회 가능한 판매 기록 0건';
+    }
+    $('refresh-data').textContent = '새로고침';
+  } catch (error) {
+    data = {source: 'Supabase', rows: [], summary: {start: '', end: ''}};
+    initializeFilters(); render(); setControlsEnabled(false);
+    document.querySelectorAll('.kpi-value').forEach(el => {el.textContent = '—';});
+    for (const id of ['revenue-note', 'quantity-note', 'transaction-note', 'store-note']) $(id).textContent = '데이터 조회 실패';
+    connection('error', '판매 데이터를 불러오지 못했습니다', error.message || '잠시 후 다시 시도해 주세요.');
+    $('source-description').textContent = '다시 불러오기가 필요합니다';
+    $('refresh-data').textContent = '다시 불러오기';
+  } finally {
+    loading = false;
+    $('refresh-data').disabled = false;
+  }
+}
+$('refresh-data').addEventListener('click', refreshData);
+refreshData();
