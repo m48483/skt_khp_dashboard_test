@@ -6,7 +6,7 @@ const number = value => new Intl.NumberFormat('ko-KR').format(Math.round(value))
 const money = value => number(value) + '원';
 const shortMoney = value => value >= 1e8 ? (value/1e8).toFixed(2) + '억' : value >= 1e4 ? number(value/1e4) + '만' : number(value);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const colors = {'기기':'#a5b888','5G요금제':'#a8a2d2','인터넷·TV':'#87b1ad','LTE요금제':'#d5bf8d','액세서리':'#b6cbd3'};
+const colors = {'기기':'#d88caf','5G요금제':'#a8a2d2','인터넷·TV':'#b18798','LTE요금제':'#d5bf8d','액세서리':'#b6cbd3'};
 const state = {start:data.summary.start, end:data.summary.end, region:'', store:'', category:'', excludeDuplicates:false, grain:'day', query:'', sort:'date', direction:-1, page:1};
 let filtered = [], tableRows = [], toastTimer;
 const empty = message => `<div class="empty-state"><span>◌</span>${esc(message)}</div>`;
@@ -51,17 +51,17 @@ function renderTrend() {
   const max=Math.max(...series.map(s=>s.revenue),1), ceiling=Math.ceil(max/4/1e6)*4e6 || 4e6;
   const x=i=>left+(series.length===1?cw/2:i*cw/(series.length-1));
   const y=v=>top+ch-v/ceiling*ch;
-  let svg=`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${state.grain==='day'?'일별':'월별'} 매출 추이, ${series.length}개 구간"><defs><linearGradient id="area-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a6c4a2" stop-opacity=".33"/><stop offset="100%" stop-color="#e1ebd9" stop-opacity=".06"/></linearGradient></defs>`;
-  for(let i=0;i<=4;i++) {const value=ceiling*i/4; svg+=`<line x1="${left}" x2="${w-right}" y1="${y(value)}" y2="${y(value)}" stroke="#edf1e9" stroke-dasharray="3 5"/><text x="${left-10}" y="${y(value)+3}" text-anchor="end" fill="#a5afa0" font-size="9">${number(value/1e6)}</text>`;}
+  let svg=`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${state.grain==='day'?'일별':'월별'} 매출 추이, ${series.length}개 구간"><defs><linearGradient id="area-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e6a5c4" stop-opacity=".33"/><stop offset="100%" stop-color="#fae7f0" stop-opacity=".06"/></linearGradient></defs>`;
+  for(let i=0;i<=4;i++) {const value=ceiling*i/4; svg+=`<line x1="${left}" x2="${w-right}" y1="${y(value)}" y2="${y(value)}" stroke="#f1e9ec" stroke-dasharray="3 5"/><text x="${left-10}" y="${y(value)+3}" text-anchor="end" fill="#afa0a6" font-size="9">${number(value/1e6)}</text>`;}
   const points=series.map((s,i)=>`${x(i)},${y(s.revenue)}`);
-  if(series.length>1) svg+=`<path d="M ${x(0)},${y(0)} L ${points.join(' L ')} L ${x(series.length-1)},${y(0)} Z" fill="url(#area-gradient)"/><polyline points="${points.join(' ')}" fill="none" stroke="#5b8d6b" stroke-width="2.3" stroke-linejoin="round"/>`;
+  if(series.length>1) svg+=`<path d="M ${x(0)},${y(0)} L ${points.join(' L ')} L ${x(series.length-1)},${y(0)} Z" fill="url(#area-gradient)"/><polyline points="${points.join(' ')}" fill="none" stroke="#c65d90" stroke-width="2.3" stroke-linejoin="round"/>`;
   series.forEach((s,i)=>{
     if(series.length<10) svg+=`<circle class="data-point" cx="${x(i)}" cy="${y(s.revenue)}" r="4"/>`;
     const hit=Math.max(6,cw/series.length);
     svg+=`<rect class="hover-target" x="${Math.max(left,x(i)-hit/2)}" y="${top}" width="${hit}" height="${ch}"><title>${s.name}: ${money(s.revenue)} · ${number(s.count)}건</title></rect>`;
     const step=Math.max(1,Math.ceil(series.length/7));
     if(i%step===0 || i===series.length-1) {
-      if(i!==series.length-1 || series.length<3 || (i-1)%step>1 || i%step===0) svg+=`<text x="${x(i)}" y="${h-12}" text-anchor="middle" fill="#9fa99a" font-size="9">${state.grain==='month'?Number(s.name.slice(5))+'월':s.name.slice(5).replace('-','/')}</text>`;
+      if(i!==series.length-1 || series.length<3 || (i-1)%step>1 || i%step===0) svg+=`<text x="${x(i)}" y="${h-12}" text-anchor="middle" fill="#a99aa0" font-size="9">${state.grain==='month'?Number(s.name.slice(5))+'월':s.name.slice(5).replace('-','/')}</text>`;
     }
   });
   $('trend-chart').innerHTML=svg+'</svg>';
@@ -72,7 +72,7 @@ function renderProduct() {
   const groups=A.group(filtered,'category'),total=A.sum(filtered,'revenue');
   if(!groups.length){$('product-chart').innerHTML=empty('상품 데이터가 없습니다');$('product-legend').innerHTML='';return;}
   let cursor=0;const stops=groups.map(g=>{const start=cursor;cursor+=total?g.revenue/total*100:0;return `${colors[g.name]} ${start}% ${cursor}%`;});
-  $('product-chart').innerHTML=`<div class="donut-wrap"><div class="donut" style="background:conic-gradient(${total?stops.join(','):'#edf1e8 0% 100%'})" role="img" aria-label="상품군 매출 비중: ${esc(groups.map(g=>g.name+' '+(total?g.revenue/total*100:0).toFixed(1)+'%').join(', '))}"></div><div class="donut-center"><span>매출 1위 상품군</span><strong>${esc(groups[0].name)}</strong><small>전체 매출의 ${total?(groups[0].revenue/total*100).toFixed(1):'0.0'}%</small></div></div>`;
+  $('product-chart').innerHTML=`<div class="donut-wrap"><div class="donut" style="background:conic-gradient(${total?stops.join(','):'#f1e8ec 0% 100%'})" role="img" aria-label="상품군 매출 비중: ${esc(groups.map(g=>g.name+' '+(total?g.revenue/total*100:0).toFixed(1)+'%').join(', '))}"></div><div class="donut-center"><span>매출 1위 상품군</span><strong>${esc(groups[0].name)}</strong><small>전체 매출의 ${total?(groups[0].revenue/total*100).toFixed(1):'0.0'}%</small></div></div>`;
   $('product-legend').innerHTML=groups.map(g=>`<div class="legend-row"><span><i class="legend-dot" style="background:${colors[g.name]}"></i>${esc(g.name)}</span><span class="amount">${shortMoney(g.revenue)}원</span><span class="percent">${total?(g.revenue/total*100).toFixed(1):'0.0'}%</span></div>`).join('');
 }
 function renderRanking() {

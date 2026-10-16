@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#17231f">
+  <meta name="theme-color" content="#2b1d28">
   <meta name="description" content="매장 판매 실적을 기간, 지역, 매장, 상품군별로 분석하는 대시보드">
   <title>판매 인사이트 · Store Analytics</title>
   <link rel="stylesheet" href="styles.css">
@@ -41,7 +41,7 @@
         <article class="kpi"><div class="kpi-title">판매 매장 수<span>⌂</span></div><div class="kpi-value" id="total-stores"></div><div class="kpi-footer" id="store-note"></div></article>
       </section>
       <section class="chart-grid">
-        <article class="panel trend-panel"><div class="panel-heading"><div><h2>매출 추이</h2><p>기간별 매출 흐름을 확인하세요</p></div><div class="segmented" aria-label="추이 집계 단위"><button data-grain="day" class="selected" aria-pressed="true">일별</button><button data-grain="month" aria-pressed="false">월별</button></div></div><div class="chart-meta"><span><i class="legend-dot green"></i>매출액</span><span>단위: 백만원</span></div><div id="trend-chart" class="trend-chart"></div><div class="chart-foot" id="trend-caption"></div></article>
+        <article class="panel trend-panel"><div class="panel-heading"><div><h2>매출 추이</h2><p>기간별 매출 흐름을 확인하세요</p></div><div class="segmented" aria-label="추이 집계 단위"><button data-grain="day" class="selected" aria-pressed="true">일별</button><button data-grain="month" aria-pressed="false">월별</button></div></div><div class="chart-meta"><span><i class="legend-dot accent"></i>매출액</span><span>단위: 백만원</span></div><div id="trend-chart" class="trend-chart"></div><div class="chart-foot" id="trend-caption"></div></article>
         <article class="panel product-panel" id="product-section"><div class="panel-heading"><div><h2>상품군별 매출</h2><p>어떤 상품이 매출을 이끌고 있을까요?</p></div><span class="subtle-icon">◔</span></div><div id="product-chart"></div><div id="product-legend" class="product-legend"></div></article>
       </section>
       <section class="chart-grid secondary-grid">
